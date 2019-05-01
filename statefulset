@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: "global"
+  name: "api-configure"
+  labels:
+    name: "api-configure"
+spec:
+  serviceName: "api-configure"
+  selector:
+    matchLabels:
+      name: "api-configure"
+  replicas: 2
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: "api-configure"
+    spec:
+      nodeSelector:
+        rc/env: "global"
+      containers:
+      - image: harbor.rc.net/com.rc/com.rc.api.configure:20190429-160447
+        name: "api-configure"
+        readinessProbe:
+          tcpSocket:
+            port: 2046
+          initialDelaySeconds: 20
+          periodSeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: 2046
+          initialDelaySeconds: 20
+          periodSeconds: 5
+        #command:
+        #- tail
+        #- -f
+        #- /etc/passwd
+        ports:
+        - containerPort:  2046
+          name:  service-port
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: configs
+          mountPath: /data/com.rc.api.configure/conf
+        env:
+        - name: SERVICEPORT
+          value: "2046"
+        - name: PRIVATEIP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: EXTJVMOPT
+          value: -Xms1024m -Xmx1024m 
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: NODENAME
+          value: global-$(HOSTNAME)
+        - name: CLUSTER
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: ZK_HOSTS
+          value: "192.168.0.159:2181,192.168.1.203:2181,192.168.2.96:2181"
+      volumes:
+      - name: configs
+        hostPath:
+          path: /var/lib/com.rc.confs/global/com.rc.api.configure/conf
+      imagePullSecrets:
+      - name: docker-reg
+      restartPolicy: Always
